@@ -8,31 +8,26 @@
   const { GoogleGenerativeAI } = require('@google/generative-ai');
 
   const app = express();
-  const PORT = 5000;
+  const PORT = process.env.PORT || 5000;
+
 
   app.use(cors());
   app.use(bodyParser.json({ limit: '10mb' }));
 
   // PDF Upload Endpoint
-  const storage = multer.diskStorage({
-    destination: 'uploads/',
-    filename: (req, file, cb) => {
-      cb(null, `${Date.now()}-${file.originalname}`);
-    }
-  });
-  const upload = multer({ storage });
+  const upload = multer({ storage: multer.memoryStorage() });
 
-  app.post('/upload', upload.single('pdf'), async (req, res) => {
-    const pdfParse = require('pdf-parse');
-    try {
-      const dataBuffer = fs.readFileSync(req.file.path);
-      const pdfData = await pdfParse(dataBuffer);
-      res.json({ text: pdfData.text });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Failed to extract PDF text' });
-    }
-  });
+app.post('/upload', upload.single('pdf'), async (req, res) => {
+  const pdfParse = require('pdf-parse');
+  try {
+    const pdfData = await pdfParse(req.file.buffer); // use buffer from memory
+    res.json({ text: pdfData.text });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to extract PDF text' });
+  }
+});
+
 
   // GEMINI SUMMARY ENDPOINT
   app.post('/summarize', async (req, res) => {
@@ -64,9 +59,12 @@
     }
   });
 
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
+  app.get('/', (req, res) => {
+  res.send('🚀 Server is live!');
   });
+
+  
+
   app.post('/chat', async (req, res) => {
     const { prompt } = req.body;
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -131,4 +129,6 @@ ${text}
   }
 });
 
-
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  });
